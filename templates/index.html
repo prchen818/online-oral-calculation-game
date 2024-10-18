@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>在线对战游戏</title>
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>请输入你的ID:</h1>
+    <input type="text" id="userId" placeholder="请输入ID">
+    <button id="joinButton">加入游戏</button>
+    <button id="ready">准备</button>
+
+    <h1>己方: <span id="player1">请准备</span></h1>
+    <h1>对方: <span id="player2">请准备</span></h1>
+
+    <h3>倒计时：<span id = "timeRemain">0</span></h3>
+    <h2>算式：<span id = "formule">等待开始</span></h2>
+    <input type="text" id="answer" placeholder="请输入答案">
+    <button id="submit">提交</button>
+
+    <script>
+        const socket = io({
+            autoConnect: false,
+        });
+        let userId = '';
+        
+
+        document.getElementById('joinButton').onclick = () => {
+            userId = document.getElementById('userId').value;
+            if (userId) {
+                socket.connect();
+                socket.emit('set_id', { id: userId });
+            }
+        };
+
+        document.getElementById('ready').onclick = () => {
+            socket.emit('ready', { id: userId });
+        };
+
+        document.getElementById('submit').onclick = () => {
+            socket.emit('answer', { id: userId, answer: document.getElementById('answer').value });
+            document.getElementById('answer').value = '';
+        };
+
+        // 接收服务端的ID接收消息
+        socket.on('id_accepted', (data) => {
+            console.log('用户 ID 接受:', data.id);
+            if (data.id === userId) {
+                document.getElementById('player1').textContent = `${data.id} 已加入游戏！`;
+                document.getElementById('joinButton').disabled = true;
+            }
+            else {
+                document.getElementById('player2').textContent = `${data.id} 已加入游戏！`;
+            }
+        });
+
+        socket.on('id_rejected', (data) => {
+            alert(data.message);
+        });
+
+        // 监听键盘按下事件
+        //document.addEventListener('keydown', (event) => {
+        //    if (userId) {
+        //        // 显示自己按下的数字键
+        //        document.getElementById('player1').textContent = `${userId} 按下了: ` + event.key;
+
+                // 发送按键到服务端
+        //        socket.emit('key_press', { player: userId, key: event.key });
+        //    }
+        //});
+
+        // 接收服务端广播的按键事件
+        socket.on('key_event', (data) => {
+            if (data.player !== userId) {
+                document.getElementById('player2').textContent = `${data.player} 按下了: ` + data.key;
+            }
+        });
+
+        socket.on("update_progress", (data) => {
+            console.log(data);
+            for (id in data) {
+                if (id === userId) {
+                    document.getElementById('player1').textContent = `${id} 进度: ${data[id]}`;
+                }
+                else {
+                    document.getElementById('player2').textContent = `${id} 进度: ${data[id]}`;
+                }
+            }
+        });
+
+
+        socket.on("problem", (data) => {
+            console.log(data);
+            document.getElementById('formule').textContent = data.formula;
+        });
+
+        socket.on("wrong", (data) => {
+            alert("calculation error");
+        });
+
+        socket.on('count_down', (data) => {
+            document.getElementById('timeRemain').textContent = data.count;
+        });
+
+        socket.on("win", (data) => {
+            alert(data.id + " win!");
+        });
+    </script>
+</body>
+</html>
